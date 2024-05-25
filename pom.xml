@@ -12,6 +12,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <spring-boot.version>2.7.6</spring-boot.version>
+<!--        <elasticseach.version>7.17.9</elasticseach.version>-->
     </properties>
     <dependencies>
         <dependency>
@@ -21,6 +22,13 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/com.alibaba/fastjson -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>2.0.32</version>
         </dependency>
 
         <dependency>
@@ -88,5 +96,4 @@
             </plugin>
         </plugins>
     </build>
-
 </project>
