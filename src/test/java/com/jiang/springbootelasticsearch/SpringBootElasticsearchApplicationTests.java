@@ -1,5 +1,6 @@
 package com.jiang.springbootelasticsearch;
 
+import co.elastic.clients.elasticsearch._types.aggregations.AggregateBuilders;
 import com.alibaba.fastjson.JSON;
 import com.jiang.springbootelasticsearch.model.User;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
@@ -27,6 +28,9 @@ import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilders;
+import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
@@ -404,7 +408,6 @@ class SpringBootElasticsearchApplicationTests {
     void testHighlightDocument() throws IOException {
         SearchRequest request = new SearchRequest();
         request.indices(INDEX);
-
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         //查询条件
         searchSourceBuilder.query(QueryBuilders.matchQuery("userName","小白"));
@@ -415,8 +418,8 @@ class SpringBootElasticsearchApplicationTests {
         highlightBuilder.field("userName");//设置高亮字段
         searchSourceBuilder.highlighter(highlightBuilder);
         request.source(searchSourceBuilder);
-
         SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+
         //返回结果：
         SearchHits hits = response.getHits();
         System.out.println(response.getTook());
@@ -430,6 +433,45 @@ class SpringBootElasticsearchApplicationTests {
             Map<String, HighlightField> highlightFields = hit.getHighlightFields();
             System.out.println(highlightFields);
         }
+        System.out.println("<=====================");
+    }
+
+    /**
+     * 最大值查询
+     * @throws IOException
+     */
+    @Test
+    void testMaxValueDocument() throws IOException{
+        SearchRequest request = new SearchRequest().indices(INDEX);
+
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        AggregationBuilder aggregationBuilder = AggregationBuilders.max("maxAge").field("age");
+        searchSourceBuilder.aggregation(aggregationBuilder);
+        request.source(searchSourceBuilder);
+
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+        System.out.println("====================>");
+        System.out.println(response);
+        System.out.println("<=====================");
+
+    }
+
+    /**
+     * 分组查询
+     * @throws IOException
+     */
+    @Test
+    void testGroupByDocument() throws IOException {
+        SearchRequest request = new SearchRequest().indices(INDEX);
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        //分组,分组名字叫age_group
+        TermsAggregationBuilder field = AggregationBuilders.terms("age_groupby").field("age");
+        searchSourceBuilder.aggregation(field);
+        request.source(searchSourceBuilder);
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+
+        System.out.println("====================>");
+        System.out.println(response);
         System.out.println("<=====================");
     }
 
