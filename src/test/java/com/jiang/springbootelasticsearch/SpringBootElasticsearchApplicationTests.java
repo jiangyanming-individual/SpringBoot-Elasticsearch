@@ -1,9 +1,7 @@
 package com.jiang.springbootelasticsearch;
 
 import com.alibaba.fastjson.JSON;
-import com.jiang.springbootelasticsearch.config.ElasticSearchClientConfig;
 import com.jiang.springbootelasticsearch.model.User;
-import org.apache.lucene.index.IndexReader;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
@@ -14,22 +12,25 @@ import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
-import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.master.AcknowledgedResponse;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
-import org.elasticsearch.client.IndicesClient;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
 import org.elasticsearch.client.indices.GetIndexRequest;
-import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.common.unit.Fuzziness;
+import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
+import org.elasticsearch.search.sort.SortOrder;
 import org.elasticsearch.xcontent.XContentType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,10 +38,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.web.servlet.resource.ResourceUrlProvider;
 
 import javax.annotation.Resource;
-import javax.json.Json;
-import javax.naming.directory.SearchResult;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Map;
 
 /**
  * 高级API 在7.15被废弃
@@ -175,7 +175,7 @@ class SpringBootElasticsearchApplicationTests {
         BulkRequest bulkRequest = new BulkRequest();
 
         ArrayList<User> userList = new ArrayList<>();
-        User user1 = new User("小贩", 18);
+        User user1 = new User("小白", 20);
         User user2 = new User("小黑", 30);
         User user3 = new User("消息", 25);
         userList.add(user1);
@@ -231,4 +231,206 @@ class SpringBootElasticsearchApplicationTests {
         }
         System.out.println(response.getAggregations());
     }
+
+    /**
+     * 条件查询
+     * @throws IOException
+     */
+    @Test
+    void testTermDocument() throws IOException {
+        SearchRequest request = new SearchRequest();
+        request.indices(INDEX);
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        //条件查询
+        searchSourceBuilder.query(QueryBuilders.termQuery("age", 25));
+        request.source(searchSourceBuilder);
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+
+        SearchHits hits = response.getHits();
+        System.out.println(response.getTook());
+        System.out.println(hits.getHits());
+        System.out.println(hits.getTotalHits());
+        System.out.println("====================>");
+        for (SearchHit hit : hits) {
+            System.out.println(hit.getSourceAsString()); //输出结果
+        }
+        System.out.println("<=====================");
+    }
+
+    /**
+     * 分页查询
+     * @throws IOException
+     */
+    @Test
+    void testRenyeDocument() throws IOException {
+
+        SearchRequest request = new SearchRequest();
+        request.indices(INDEX);
+        //查询请求：
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.matchAllQuery());
+        //分页条件
+        searchSourceBuilder.from(0);
+        searchSourceBuilder.size(4);
+        request.source(searchSourceBuilder);
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+
+
+        SearchHits hits = response.getHits();
+        System.out.println(response.getTook());
+        System.out.println(hits.getHits());
+        System.out.println(hits.getTotalHits());
+        System.out.println("====================>");
+        for (SearchHit hit : hits) {
+            System.out.println(hit.getSourceAsString()); //输出结果
+        }
+        System.out.println("<=====================");
+
+    }
+
+    /**
+     * 排序查询
+     * @throws IOException
+     */
+    @Test
+    void testSortDocument() throws IOException {
+        SearchRequest request = new SearchRequest();
+        request.indices(INDEX);
+
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.matchAllQuery());
+        searchSourceBuilder.sort("age", SortOrder.DESC);//降序
+        request.source(searchSourceBuilder);
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+
+        SearchHits hits = response.getHits();
+        System.out.println(response.getTook());
+        System.out.println(hits.getHits());
+        System.out.println(hits.getTotalHits());
+        System.out.println("====================>");
+        for (SearchHit hit : hits) {
+            System.out.println(hit.getSourceAsString()); //输出结果
+        }
+        System.out.println("<=====================");
+    }
+
+    /**
+     * 组合查询
+     * @throws IOException
+     */
+    @Test
+    void testQueryDocument() throws IOException {
+        SearchRequest request = new SearchRequest();
+        request.indices(INDEX);
+
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        BoolQueryBuilder boolQueryBuilder = QueryBuilders.boolQuery(); //布尔查询
+        boolQueryBuilder.must(QueryBuilders.termQuery("age", 25));
+        //一定不包含
+        boolQueryBuilder.mustNot(QueryBuilders.termQuery("userName", "jiangyanming"));
+
+        searchSourceBuilder.query(boolQueryBuilder);
+        request.source(searchSourceBuilder);
+
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+
+        SearchHits hits = response.getHits();
+        System.out.println(response.getTook());
+        System.out.println(hits.getHits());
+        System.out.println(hits.getTotalHits());
+        System.out.println("====================>");
+        for (SearchHit hit : hits) {
+            System.out.println(hit.getSourceAsString()); //输出结果
+        }
+        System.out.println("<=====================");
+    }
+
+    /**
+     * 范围查询
+     * @throws IOException
+     */
+    @Test
+    void testRangeDocument() throws IOException {
+
+        SearchRequest request = new SearchRequest().indices(INDEX);
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery("age");
+        rangeQueryBuilder.gt(20);
+        searchSourceBuilder.query(rangeQueryBuilder); //查询条件
+        request.source(searchSourceBuilder);
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+
+        SearchHits hits = response.getHits();
+        System.out.println(response.getTook());
+        System.out.println(hits.getHits());
+        System.out.println(hits.getTotalHits());
+        System.out.println("====================>");
+        for (SearchHit hit : hits) {
+            System.out.println(hit.getSourceAsString()); //输出结果
+        }
+        System.out.println("<=====================");
+    }
+
+    /**
+     * 模糊查询
+     * @throws IOException
+     */
+    @Test
+    void testFuzzyDocument() throws IOException {
+        SearchRequest request = new SearchRequest();
+        request.indices(INDEX);
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        //模糊查询
+        searchSourceBuilder.query(QueryBuilders.fuzzyQuery("userName","小").fuzziness(Fuzziness.ONE));
+        request.source(searchSourceBuilder);
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+
+        SearchHits hits = response.getHits();
+        System.out.println(response.getTook());
+        System.out.println(hits.getHits());
+        System.out.println(hits.getTotalHits());
+        System.out.println("====================>");
+        for (SearchHit hit : hits) {
+            System.out.println(hit.getSourceAsString()); //输出结果
+        }
+        System.out.println("<=====================");
+    }
+
+    /**
+     * 高亮查询：
+     * @throws IOException
+     */
+    @Test
+    void testHighlightDocument() throws IOException {
+        SearchRequest request = new SearchRequest();
+        request.indices(INDEX);
+
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        //查询条件
+        searchSourceBuilder.query(QueryBuilders.matchQuery("userName","小白"));
+        //设置高亮
+        HighlightBuilder highlightBuilder = new HighlightBuilder();
+        highlightBuilder.preTags("<font color='red'>");//设置标签前缀
+        highlightBuilder.postTags("</font>");//设置标签后缀
+        highlightBuilder.field("userName");//设置高亮字段
+        searchSourceBuilder.highlighter(highlightBuilder);
+        request.source(searchSourceBuilder);
+
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+        //返回结果：
+        SearchHits hits = response.getHits();
+        System.out.println(response.getTook());
+        System.out.println(hits.getHits());
+        System.out.println(hits.getTotalHits());
+        System.out.println("====================>");
+        for (SearchHit hit : hits) {
+            //输出结果
+            System.out.println(hit.getSourceAsString());
+            //打印高亮结果：
+            Map<String, HighlightField> highlightFields = hit.getHighlightFields();
+            System.out.println(highlightFields);
+        }
+        System.out.println("<=====================");
+    }
+
 }
